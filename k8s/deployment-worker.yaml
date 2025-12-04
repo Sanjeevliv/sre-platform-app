@@ -1,0 +1,44 @@
+# k8s/deployment-worker.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-service
+spec:
+  replicas: 1 # Workers typically start at 1 or 2, scaled by HPA later
+  selector:
+    matchLabels:
+      app: worker-service
+  template:
+    metadata:
+      labels:
+        app: worker-service
+    spec:
+      containers:
+      - name: worker-service-container
+        # Replace this with the actual image path you pushed to Artifact Registry
+        image: gcr.io/sre-portfolio/worker-service:latest 
+        # Crucial fix from your previous logs 
+        env:
+        - name: REDIS_ADDR
+          value: "redis-service:6379" # Assumes Redis is deployed with this ClusterIP Service name
+        
+        ports:
+        - containerPort: 8081
+        # Phase 2 deliverable: Health/Readiness probes
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+        
+        resources:
+          # Required for GKE Autopilot and SRE Best Practice
+          requests:
+            cpu: "50m"
+            memory: "100Mi"
+          limits:
+            cpu: "200m"
+            memory: "300Mi"

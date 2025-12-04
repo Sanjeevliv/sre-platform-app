@@ -1,0 +1,12 @@
+# k8s/service-api.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-service-lb
+spec:
+  type: LoadBalancer # Exposes your API publicly, but check costs!
+  selector:
+    app: api-service
+  ports:
+    - port: 80
+      targetPort: 8080

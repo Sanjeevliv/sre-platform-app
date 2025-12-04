@@ -1,0 +1,37 @@
+# k8s/deployment-api.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api-service
+  template:
+    metadata:
+      labels:
+        app: api-service
+    spec:
+      containers:
+      - name: api-service-container
+        # Replace this with the actual image path you pushed to Artifact Registry
+        image: gcr.io/sre-portfolio/api-service:latest 
+        ports:
+        - containerPort: 8080
+        # Phase 2 deliverable: Health/Readiness probes are essential [cite: 32, 33, 34]
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "100Mi"
+          limits:
+            cpu: "200m"
+            memory: "300Mi"
