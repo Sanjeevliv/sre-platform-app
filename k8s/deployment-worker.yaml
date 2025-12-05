@@ -16,7 +16,7 @@ spec:
       containers:
       - name: worker-service-container
         # Replace this with the actual image path you pushed to Artifact Registry
-        image: gcr.io/sre-portfolio/worker-service:latest 
+        image: asia-south1-docker.pkg.dev/sre-portfolio/sre-portfolio-repo/worker-service:latest 
         # Crucial fix from your previous logs 
         env:
         - name: REDIS_ADDR
