@@ -10,14 +10,21 @@ import (
 	"time"
 
 	"github.com/sanjeevsethi/sre-platform-app/internal/api"
+	"github.com/sanjeevsethi/sre-platform-app/internal/config"
 )
 
 func main() {
+	// 1. Load Configuration
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+
 	// Get the configured mux from the internal package
 	mux := api.NewServer()
 
 	srv := &http.Server{
-		Addr:    ":8080",
+		Addr:    ":" + cfg.APIPort,
 		Handler: mux,
 	}
 
@@ -25,7 +32,7 @@ func main() {
 	serverErrors := make(chan error, 1)
 
 	go func() {
-		log.Println("Starting api_service on :8080...")
+		log.Printf("Starting api_service on :%s...", cfg.APIPort)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			serverErrors <- err
 		}

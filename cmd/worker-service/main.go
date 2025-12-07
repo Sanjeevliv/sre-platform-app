@@ -12,19 +12,20 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/sanjeevsethi/sre-platform-app/internal/config"
 	"github.com/sanjeevsethi/sre-platform-app/internal/worker"
 )
 
 func main() {
-	// 6. Get Redis address from Environment Variable, or use default
-	redisAddr := os.Getenv("REDIS_ADDR")
-	if redisAddr == "" {
-		redisAddr = "localhost:6379" // Default for local dev
+	// 1. Load Configuration
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
 	}
 
 	// 7. Connect to Redis
 	rdb := redis.NewClient(&redis.Options{
-		Addr: redisAddr,
+		Addr: cfg.RedisAddr,
 	})
 
 	// Check Redis connection
@@ -33,9 +34,9 @@ func main() {
 	defer cancel()
 
 	if _, err := rdb.Ping(ctx).Result(); err != nil {
-		log.Fatalf("Unable to connect to Redis at %s: %v", redisAddr, err)
+		log.Fatalf("Unable to connect to Redis at %s: %v", cfg.RedisAddr, err)
 	}
-	log.Printf("Connected to Redis at %s", redisAddr)
+	log.Printf("Connected to Redis at %s", cfg.RedisAddr)
 
 	// 8. Launch the worker loop in a background goroutine
 	var wg sync.WaitGroup
@@ -54,12 +55,12 @@ func main() {
 	})
 
 	metricsSrv := &http.Server{
-		Addr:    ":8081",
+		Addr:    ":" + cfg.WorkerPort,
 		Handler: mux,
 	}
 
 	go func() {
-		log.Println("Starting worker-service metrics server on :8081...")
+		log.Printf("Starting worker-service metrics server on :%s...", cfg.WorkerPort)
 		if err := metricsSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Printf("Metrics server error: %v", err)
 		}
