@@ -1,0 +1,6 @@
+# Helm templates are Go templates, not Smarty
+charts/**/*.tpl linguist-language=Go
+charts/**/*.yaml linguist-language=YAML
+
+# Ensure Go is the primary language
+*.go linguist-detectable=true
