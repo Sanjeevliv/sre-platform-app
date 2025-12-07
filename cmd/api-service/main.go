@@ -13,6 +13,8 @@ import (
 	"github.com/sanjeevsethi/sre-platform-app/internal/api"
 	"github.com/sanjeevsethi/sre-platform-app/internal/config"
 	"github.com/sanjeevsethi/sre-platform-app/internal/logger"
+	"github.com/sanjeevsethi/sre-platform-app/internal/telemetry"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 func main() {
@@ -22,16 +24,31 @@ func main() {
 		stdlog.Fatalf("Failed to load config: %v", err)
 	}
 
-	// 2. Initialize Logger
+	// 3. Initialize Logger
 	// In production, we'd probably want this to be false (JSON logs)
 	// For dev, reading console logs is nicer.
 	// We could put this in config too: cfg.LogPretty
 	logger.Init("info", os.Getenv("GIN_MODE") != "release")
 
+	// 4. Initialize Tracing
+	shutdownTracer, err := telemetry.InitTracer("api-service")
+	if err != nil {
+		stdlog.Printf("Failed to init tracer: %v", err)
+		// We don't fatal here to allow running without collector in dev if needed,
+		// though strictly SRE practice says observability is critical.
+	} else {
+		defer func() {
+			if err := shutdownTracer(context.Background()); err != nil {
+				stdlog.Printf("Error shutting down tracer: %v", err)
+			}
+		}()
+	}
+
 	// Get the configured mux from the internal package
 	r := api.NewServer()
 
 	// Register Middleware
+	r.Use(otelgin.Middleware("api-service")) // OpenTelemetry
 	r.Use(api.RequestIDMiddleware())
 	r.Use(api.LoggerMiddleware())
 

@@ -20,8 +20,10 @@ services:
     environment:
       - API_PORT=8080
       - GIN_MODE=debug # Good for local dev visibility
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
     depends_on:
       - redis # Though strict dependency isn't required for API, it's good practice for the stack
+      - jaeger
 
   worker-service:
     build:
@@ -33,6 +35,18 @@ services:
     environment:
       - WORKER_PORT=8081
       - REDIS_ADDR=redis:6379
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
     depends_on:
       redis:
         condition: service_healthy
+      jaeger:
+        condition: service_started
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: sre-jaeger
+    ports:
+      - "16686:16686" # UI
+      - "4318:4318" # OTLP HTTP
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
