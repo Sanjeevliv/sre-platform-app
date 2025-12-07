@@ -2,37 +2,49 @@ package main
 
 import (
 	"context"
-	"log"
+	stdlog "log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/sanjeevsethi/sre-platform-app/internal/api"
 	"github.com/sanjeevsethi/sre-platform-app/internal/config"
+	"github.com/sanjeevsethi/sre-platform-app/internal/logger"
 )
 
 func main() {
 	// 1. Load Configuration
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		stdlog.Fatalf("Failed to load config: %v", err)
 	}
 
+	// 2. Initialize Logger
+	// In production, we'd probably want this to be false (JSON logs)
+	// For dev, reading console logs is nicer.
+	// We could put this in config too: cfg.LogPretty
+	logger.Init("info", os.Getenv("GIN_MODE") != "release")
+
 	// Get the configured mux from the internal package
-	mux := api.NewServer()
+	r := api.NewServer()
+
+	// Register Middleware
+	r.Use(api.RequestIDMiddleware())
+	r.Use(api.LoggerMiddleware())
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.APIPort,
-		Handler: mux,
+		Handler: r,
 	}
 
 	// Channel to listen for errors coming from the listener.
 	serverErrors := make(chan error, 1)
 
 	go func() {
-		log.Printf("Starting api_service on :%s...", cfg.APIPort)
+		log.Info().Str("port", cfg.APIPort).Msg("Starting api_service")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			serverErrors <- err
 		}
@@ -45,10 +57,10 @@ func main() {
 	// Block until we receive our signal.
 	select {
 	case err := <-serverErrors:
-		log.Fatalf("Error starting server: %v", err)
+		log.Fatal().Err(err).Msg("Error starting server")
 
 	case <-shutdown:
-		log.Println("Start shutdown...")
+		log.Info().Msg("Start shutdown...")
 
 		// Give outstanding requests a deadline for completion.
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -56,11 +68,11 @@ func main() {
 
 		// Asking listener to shutdown and shed load.
 		if err := srv.Shutdown(ctx); err != nil {
-			log.Printf("Graceful shutdown did not complete in %v: %v", 5*time.Second, err)
+			log.Error().Err(err).Dur("timeout", 5*time.Second).Msg("Graceful shutdown did not complete")
 			if err := srv.Close(); err != nil {
-				log.Fatalf("Could not stop http server: %v", err)
+				log.Fatal().Err(err).Msg("Could not stop http server")
 			}
 		}
 	}
-	log.Println("Server stopped")
+	log.Info().Msg("Server stopped")
 }

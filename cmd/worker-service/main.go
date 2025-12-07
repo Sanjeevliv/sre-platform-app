@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -10,9 +9,13 @@ import (
 	"syscall"
 	"time"
 
+	stdlog "log"
+
 	"github.com/go-redis/redis/v8"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rs/zerolog/log"
 	"github.com/sanjeevsethi/sre-platform-app/internal/config"
+	"github.com/sanjeevsethi/sre-platform-app/internal/logger"
 	"github.com/sanjeevsethi/sre-platform-app/internal/worker"
 )
 
@@ -20,8 +23,11 @@ func main() {
 	// 1. Load Configuration
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		stdlog.Fatalf("Failed to load config: %v", err)
 	}
+
+	// 2. Initialize Logger
+	logger.Init("info", os.Getenv("GIN_MODE") != "release")
 
 	// 7. Connect to Redis
 	rdb := redis.NewClient(&redis.Options{
@@ -34,9 +40,9 @@ func main() {
 	defer cancel()
 
 	if _, err := rdb.Ping(ctx).Result(); err != nil {
-		log.Fatalf("Unable to connect to Redis at %s: %v", cfg.RedisAddr, err)
+		log.Fatal().Err(err).Str("addr", cfg.RedisAddr).Msg("Unable to connect to Redis")
 	}
-	log.Printf("Connected to Redis at %s", cfg.RedisAddr)
+	log.Info().Str("addr", cfg.RedisAddr).Msg("Connected to Redis")
 
 	// 8. Launch the worker loop in a background goroutine
 	var wg sync.WaitGroup
@@ -60,9 +66,9 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("Starting worker-service metrics server on :%s...", cfg.WorkerPort)
+		log.Info().Str("port", cfg.WorkerPort).Msg("Starting worker-service metrics server")
 		if err := metricsSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("Metrics server error: %v", err)
+			log.Error().Err(err).Msg("Metrics server error")
 		}
 	}()
 
@@ -71,22 +77,22 @@ func main() {
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
 
 	<-shutdown
-	log.Println("Shutdown signal received...")
+	log.Info().Msg("Shutdown signal received...")
 
 	// 1. Signal worker to stop
 	cancel()
 
 	// 2. Wait for worker to finish
-	log.Println("Waiting for worker to exit...")
+	log.Info().Msg("Waiting for worker to exit...")
 	wg.Wait()
-	log.Println("Worker exited.")
+	log.Info().Msg("Worker exited.")
 
 	// 3. Shutdown metrics server
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 
 	if err := metricsSrv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("Metrics server forced to shutdown: %v", err)
+		log.Error().Err(err).Msg("Metrics server forced to shutdown")
 	}
-	log.Println("Metrics server stopped.")
+	log.Info().Msg("Metrics server stopped.")
 }
