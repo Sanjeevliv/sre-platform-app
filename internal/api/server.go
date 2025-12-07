@@ -1,9 +1,9 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -21,30 +21,29 @@ var (
 	)
 )
 
-// NewServer returns a new HTTP server multiplexer with all routes registered.
-func NewServer() *http.ServeMux {
-	mux := http.NewServeMux()
+// NewServer returns a new Gin Engine with all routes registered.
+func NewServer() *gin.Engine {
+	r := gin.Default()
 
-	mux.HandleFunc("/", rootHandler)
-	mux.HandleFunc("/healthz", healthzHandler)
-	// Exposing the /metrics endpoint using the promhttp handler
-	mux.Handle("/metrics", promhttp.Handler())
+	r.GET("/", rootHandler)
+	r.GET("/healthz", healthzHandler)
+	// Exposing the /metrics endpoint using the promhttp handler wrapped in gin
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
-	return mux
+	return r
 }
 
 // Creating handler for /healthz
-func healthzHandler(w http.ResponseWriter, r *http.Request) {
+func healthzHandler(c *gin.Context) {
 	// Instrument this endpoint call
 	httpRequestTotal.With(prometheus.Labels{"path": "/healthz"}).Inc()
 
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintln(w, "ok")
+	c.String(http.StatusOK, "ok")
 }
 
-func rootHandler(w http.ResponseWriter, r *http.Request) {
+func rootHandler(c *gin.Context) {
 	// Instrument this endpoint call
 	httpRequestTotal.With(prometheus.Labels{"path": "/"}).Inc()
 
-	fmt.Fprintln(w, "SRE Platform API Service")
+	c.String(http.StatusOK, "SRE Platform API Service")
 }
