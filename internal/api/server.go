@@ -5,27 +5,22 @@ import (
 	"runtime"
 
 	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sanjeevsethi/sre-platform-app/internal/metadata"
 )
 
-// Defining my custom Prometheus metric.
-// Using a CounterVec to count requests and label them by 'path'.
-var (
-	httpRequestTotal = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "api_service_http_requests_total",
-			Help: "Total number of Http requests for the api-service.",
-		},
-		[]string{"path"},
-	)
-)
-
 // NewServer returns a new Gin Engine with all routes registered.
-func NewServer() *gin.Engine {
-	r := gin.Default()
+func NewServer(middlewares ...gin.HandlerFunc) *gin.Engine {
+	r := gin.New() // Use New() to avoid default Logger/Recovery if we adding our own, or we can add them manually.
+	// But sticking to Default() + our own is fine, though double logging might happen if we use ours.
+	// The user wanted SRE logs (JSON). Gin default logs to stdout (text).
+	// Let's use New() and add Recovery manually. Our logger middleware replaces the default Logger.
+	r.Use(gin.Recovery())
+
+	// Add passed middlewares
+	for _, m := range middlewares {
+		r.Use(m)
+	}
 
 	r.GET("/", rootHandler)
 	r.GET("/healthz", healthzHandler)
@@ -40,27 +35,22 @@ func NewServer() *gin.Engine {
 
 // Creating handler for /healthz (Liveness)
 func healthzHandler(c *gin.Context) {
-	httpRequestTotal.With(prometheus.Labels{"path": "/healthz"}).Inc()
 	c.String(http.StatusOK, "ok")
 }
 
 // Creating handler for /ready (Readiness)
 func readyHandler(c *gin.Context) {
-	httpRequestTotal.With(prometheus.Labels{"path": "/ready"}).Inc()
 	// Future: Check DB/Redis connections here.
 	c.String(http.StatusOK, "ready")
 }
 
 // Version Handler
 func versionHandler(c *gin.Context) {
-	httpRequestTotal.With(prometheus.Labels{"path": "/version"}).Inc()
 	c.JSON(http.StatusOK, metadata.GetBuildInfo())
 }
 
 // Debug Info Handler
 func debugInfoHandler(c *gin.Context) {
-	httpRequestTotal.With(prometheus.Labels{"path": "/debug/info"}).Inc()
-
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 
@@ -74,8 +64,5 @@ func debugInfoHandler(c *gin.Context) {
 }
 
 func rootHandler(c *gin.Context) {
-	// Instrument this endpoint call
-	httpRequestTotal.With(prometheus.Labels{"path": "/"}).Inc()
-
 	c.String(http.StatusOK, "SRE Platform API Service")
 }

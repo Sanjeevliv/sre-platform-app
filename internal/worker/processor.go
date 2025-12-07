@@ -25,6 +25,20 @@ var (
 			Help: "Total number of jobs that failed processing.",
 		},
 	)
+	queueDepth = promauto.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "worker_queue_depth",
+			Help: "Current depth of the jobs queue in Redis.",
+		},
+	)
+	jobDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "worker_job_duration_seconds",
+			Help:    "Duration of job processing.",
+			Buckets: prometheus.DefBuckets,
+		},
+		[]string{"status"},
+	)
 )
 
 // Job represents the work unit with metadata
@@ -37,6 +51,23 @@ type Job struct {
 // Start begins the worker processing loop. It blocks until the context is done.
 func Start(ctx context.Context, rdb *redis.Client) {
 	log.Info().Msg("Starting worker process loop...")
+
+	// Launch background monitor for queue depth
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				val, err := rdb.LLen(ctx, "jobs").Result()
+				if err == nil {
+					queueDepth.Set(float64(val))
+				}
+			}
+		}
+	}()
 
 	for {
 		select {
@@ -77,14 +108,19 @@ func Start(ctx context.Context, rdb *redis.Client) {
 		l.Info().Str("payload", job.Payload).Msg("Processing job")
 
 		// 4. Simulate job processing
+		start := time.Now()
 		time.Sleep(100 * time.Millisecond)
+		duration := time.Since(start).Seconds()
 
 		// 5. Instrument the outcome
+		status := "success"
 		if job.Payload == "fail_me" {
+			status = "error"
 			jobsFailedTotal.Inc()
 			l.Warn().Str("payload", job.Payload).Msg("Job failed")
 		} else {
 			jobsProcessedTotal.Inc()
 		}
+		jobDuration.WithLabelValues(status).Observe(duration)
 	}
 }

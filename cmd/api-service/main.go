@@ -44,13 +44,18 @@ func main() {
 		}()
 	}
 
-	// Get the configured mux from the internal package
-	r := api.NewServer()
-
-	// Register Middleware
-	r.Use(otelgin.Middleware("api-service")) // OpenTelemetry
-	r.Use(api.RequestIDMiddleware())
-	r.Use(api.LoggerMiddleware())
+	// 5. Create Server with Middleware
+	// Order matters:
+	// 1. OTel (Tracing) - starts trace
+	// 2. RequestID - tags trace/log
+	// 3. Metrics - measures duration of handler
+	// 4. Logger - logs final status/duration
+	r := api.NewServer(
+		otelgin.Middleware("api-service"),
+		api.RequestIDMiddleware(),
+		api.MetricsMiddleware(),
+		api.LoggerMiddleware(),
+	)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.APIPort,

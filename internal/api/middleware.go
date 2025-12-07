@@ -1,14 +1,29 @@
 package api
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog/log"
 )
 
 const RequestIDHeader = "X-Request-ID"
+
+// Metrics
+var (
+	httpRequestDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "api_http_request_duration_seconds",
+			Help:    "Duration of HTTP requests.",
+			Buckets: prometheus.DefBuckets,
+		},
+		[]string{"method", "path", "status"},
+	)
+)
 
 func RequestIDMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -25,6 +40,20 @@ func RequestIDMiddleware() gin.HandlerFunc {
 		c.Set("request_id", rid)
 
 		c.Next()
+	}
+}
+
+func MetricsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+
+		c.Next()
+
+		duration := time.Since(start).Seconds()
+		status := strconv.Itoa(c.Writer.Status())
+		path := c.Request.URL.Path
+
+		httpRequestDuration.WithLabelValues(c.Request.Method, path, status).Observe(duration)
 	}
 }
 
