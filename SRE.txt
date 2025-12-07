@@ -1,0 +1,135 @@
+﻿Practical Cloud Native SRE Learning Curve
+Objective: execute a 10-week sprint to transition into a Site Reliability Engineer role. Outcome: A live, production-grade microservices platform documented at sanjeevsethi.in and open-source contributions.
+________________
+
+
+🛤️ Track 1: The SRE Portfolio Project
+Focus: 20-25 Hours/Week Goal: Build a complete, observable, and reliable microservice platform. Your portfolio site will not just be a static blog; it will be the frontend and documentation for the live system you build.
+Phase 1: Platform Foundation (Weeks 1-2)
+Goal: Provision a production-grade Kubernetes cluster using Infrastructure as Code (IaC). Tech Stack: Terraform, Google Cloud (GKE), Cloud DNS.
+Actions:
+* IaC Repository: Initialize sre-platform-infra on GitHub.
+* Terraform Core:
+   * Provision a GKE Cluster (Standard or Autopilot).
+   * Define VPC, private subnets, and essential firewall rules.
+   * Provision a Cloud DNS zone for sanjeevsethi.in.
+* State Management: Configure Terraform to store state remotely in a GCS bucket (SRE best practice).
+* Documentation: Write a README.md explaining the infrastructure architecture and prerequisites.
+Deliverable: capability to run terraform apply to spin up the entire cloud platform and terraform destroy to tear it down cleanly.
+________________
+
+
+Phase 2: The Target Application (Weeks 3-4)
+Goal: Build "Production-Ready" Go microservices with Clean Architecture and strict diagnostics. Tech Stack: Go (Gin/Fiber), Docker, Redis, Viper/Godotenv.
+Actions:
+* App Repository: Initialize sre-platform-app on GitHub.
+* Core Architecture (Refactor):
+   * Clean Architecture: Structure code into /cmd, /internal, and /pkg.
+   * Framework: Use Gin or Fiber for HTTP routing.
+   * Graceful Shutdown: Implement context-aware shutdowns to ensure in-flight requests finish before pod termination.
+   * Config: Use Viper or godotenv to load config via .env, flags, and environment variables.
+* Microservices:
+   * api-service: REST API handling user requests.
+   * worker-service: Background processor pulling jobs from Redis.
+* Health & Diagnostics:
+   * /healthz: Liveness probe.
+   * /ready: Readiness probe (checks DB/Redis connectivity).
+   * /version: Returns build time, Git SHA, and Go version.
+   * /debug/info: Internal endpoint showing CPU, RAM, and Goroutine counts.
+* Containerization:
+   * Write optimized multi-stage Dockerfiles (Build -> Distroless/Scratch).
+   * Add HEALTHCHECK instruction in Dockerfile.
+   * Create docker-compose.yaml for full local stack testing.
+Deliverable: High-quality, instrumented container images pushed to Artifact Registry with semantic versioning.
+________________
+
+
+Phase 3: The SRE Core: Observability (Weeks 5-7)
+Goal: Implement the three pillars (Metrics, Logs, Traces) with correlation. Tech Stack: Google Managed Prometheus, Zap/Zerolog, OpenTelemetry.
+Actions:
+* Structured Logging:
+   * Replace standard logging with Zap or Zerolog.
+   * Enforce JSON formatting for all logs.
+   * Correlation IDs: Pass a Request ID via context from api-service -> worker-service to trace logs across boundaries.
+* Distributed Tracing:
+   * Instrument code with the OpenTelemetry (OTel) SDK.
+   * Export traces to Google Cloud Trace (or Grafana Tempo).
+   * Ensure trace_id is injected into logs for linkage.
+* Metrics (Prometheus):
+   * Expose standard Go metrics + Custom business metrics (e.g., db_latency, job_queue_depth).
+   * Define SLIs (Service Level Indicators):
+      * api_availability: % of non-5xx responses.
+      * api_latency: % of requests < 300ms.
+   * Define SLOs (Service Level Objectives): Target 99.9% Availability.
+* Dashboards:
+   * Create a "Service Health" dashboard in Grafana/Monitoring displaying:
+      * SLO Status & Error Budget Burn Rate.
+      * Golden Signals (Latency, Traffic, Errors, Saturation).
+      * Pod Restarts & Goroutine leaks.
+* Alerting: Configure alerts for high Error Budget burn or critical saturation.
+Deliverable: A monitor.sanjeevsethi.in dashboard showing real-time health, traces, and logs.
+________________
+
+
+Phase 4: Production Hardening & Automation (Weeks 8-9)
+Goal: Secure the cluster and create a zero-touch CI/CD pipeline. Tech Stack: GitHub Actions, Helm, Cert-Manager, Network Policies.
+Actions:
+* Kubernetes Hardening:
+   * HPA: Configure Horizontal Pod Autoscaler based on CPU/Memory.
+   * PDB: Define PodDisruptionBudgets to ensure availability during upgrades.
+   * Probes: Tune Liveness vs. Readiness probes to prevent cascading failures.
+   * Resources: Set strict Requests and Limits for every container.
+   * Security: Implement Network Policies (Deny All by default; allow only necessary Ingress).
+   * Secrets: Move sensitive env vars to K8s Secrets (or External Secrets Operator).
+* HTTPS: Install cert-manager for automatic SSL issuance on sanjeevsethi.in.
+* CI/CD Pipeline:
+   * Create a custom Helm chart for the stack.
+   * GitHub Actions Workflow:
+      * Run go fmt, go vet, and tests.
+      * Build Docker image with Git SHA tagging.
+      * Push to Registry.
+      * Deploy to GKE via helm upgrade.
+Deliverable: Zero-touch deployment: git push -> Tests -> Build -> Deploy -> Secure HTTPS Cluster.
+________________
+
+
+Phase 5: The Portfolio Showcase (Week 10)
+Goal: Create the documentation hub for your project. Tech Stack: Hugo (or similar static site generator).
+Actions:
+* Site Repo: Create portfolio-site.
+* Build Content:
+   * Home: Executive summary of the platform.
+   * Architecture: Diagrams of GKE, Terraform, and CI/CD flows.
+   * Live Dashboard: Link to monitor.sanjeevsethi.in (guest access).
+   * Code: Deep links to sre-platform-infra and sre-platform-app.
+   * Blog: Articles on your learnings from Track 2.
+* Frontend Extras:
+   * Embed a simple "System Status" widget.
+   * (Optional) Real-time log viewer using Websockets.
+Deliverable: Your finished portfolio at sanjeevsethi.in acting as the "front door" to your live SRE project.
+________________
+
+
+Phase 6: Google-Worthy Enhancements (Bonus)
+Goal: Push beyond standard implementation to demonstrate seniority.
+* Chaos Engineering: Implement "Chaos Buttons" in an admin panel (Force CPU spike, Random Panic) to test HPA/Alerts.
+* Load Testing: Integrate k6 to demonstrate auto-scaling under stress.
+* Service Mesh: Add Istio or Linkerd for traffic splitting and mTLS.
+* Postmortem: Document a simulated outage and your incident response process.
+________________
+
+
+📚 Track 2: The SRE Contributor Path
+Focus: 10-15 Hours/Week (Parallel to Track 1) Goal: Deep-dive into SRE theory ("the why") and contribute to open-source ("the community").
+Weeks 1-3: Go & SRE Theory
+* Learning: Deepen Go knowledge (Concurrency, Channels, Interfaces).
+* Reading: Google SRE Book (Intro & Principles). Focus on SLIs/SLOs and Error Budgets.
+* Action: Apply this immediately to Track 1 (building your Go apps).
+Weeks 4-6: Kubernetes Internals & Contribution Prep
+* Learning: Go beyond kubectl. Understand etcd, api-server, scheduler, kubelet. Watch "Kubernetes the Hard Way."
+* Reading: Google SRE Book (Practices). Focus on Alerting and On-Call.
+* Action (Open Source): Pick one CNCF project. Join their Slack. Read CONTRIBUTING.md. Set up local build environment.
+Weeks 7-10: Active Contribution
+* Learning: Debugging. Learn to read stack traces, use pprof in Go, and debug K8s pods.
+* Action (Open Source): Find "good first issues." Submit a PR (documentation or small fix).
+* Blog: Write a post on sanjeevsethi.in titled "My First PR" or "Debugging [Problem]."

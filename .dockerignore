@@ -1,0 +1,30 @@
+# Version Control
+.git/
+.gitignore
+
+# Build Artifacts
+main
+*.exe
+*.test
+*.out
+*.rdb
+
+# Documentation
+README.md
+SRE.txt
+_SRE.txt
+docs/
+*.md
+walkthrough.md
+implementation_plan.md
+task.md
+
+# Application Metadata
+k8s/
+.dockerignore
+LICENSE
+
+# Local dev config
+.env
+.vscode/
+.idea/
