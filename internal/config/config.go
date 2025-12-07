@@ -7,9 +7,11 @@ import (
 )
 
 type Config struct {
-	APIPort    string `mapstructure:"API_PORT"`
-	WorkerPort string `mapstructure:"WORKER_PORT"`
-	RedisAddr  string `mapstructure:"REDIS_ADDR"`
+	APIPort        string `mapstructure:"API_PORT"`
+	WorkerPort     string `mapstructure:"WORKER_PORT"`
+	RedisAddr      string `mapstructure:"REDIS_ADDR"`
+	RateLimitRPS   int    `mapstructure:"RATE_LIMIT_RPS"`
+	RateLimitBurst int    `mapstructure:"RATE_LIMIT_BURST"`
 }
 
 func Load() (*Config, error) {
@@ -17,6 +19,8 @@ func Load() (*Config, error) {
 	viper.SetDefault("API_PORT", "8080")
 	viper.SetDefault("WORKER_PORT", "8081")
 	viper.SetDefault("REDIS_ADDR", "localhost:6379")
+	viper.SetDefault("RATE_LIMIT_RPS", 100)
+	viper.SetDefault("RATE_LIMIT_BURST", 50)
 
 	// 2. Load from .env file (if present)
 	viper.SetConfigName(".env") // name of config file (without extension)

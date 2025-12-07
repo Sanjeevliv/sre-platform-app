@@ -1,6 +1,7 @@
 package api
 
 import (
+	"net/http"
 	"strconv"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/time/rate"
 )
 
 const RequestIDHeader = "X-Request-ID"
@@ -54,6 +56,20 @@ func MetricsMiddleware() gin.HandlerFunc {
 		path := c.Request.URL.Path
 
 		httpRequestDuration.WithLabelValues(c.Request.Method, path, status).Observe(duration)
+	}
+}
+
+// RateLimitMiddleware creates a token bucket rate limiter.
+func RateLimitMiddleware(rps int, burst int) gin.HandlerFunc {
+	limiter := rate.NewLimiter(rate.Limit(rps), burst)
+	return func(c *gin.Context) {
+		if !limiter.Allow() {
+			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
+				"error": "too many requests",
+			})
+			return
+		}
+		c.Next()
 	}
 }
 

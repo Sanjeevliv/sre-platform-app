@@ -13,6 +13,7 @@ import (
 	"github.com/sanjeevsethi/sre-platform-app/internal/api"
 	"github.com/sanjeevsethi/sre-platform-app/internal/config"
 	"github.com/sanjeevsethi/sre-platform-app/internal/logger"
+	"github.com/sanjeevsethi/sre-platform-app/internal/queue"
 	"github.com/sanjeevsethi/sre-platform-app/internal/telemetry"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
@@ -44,15 +45,21 @@ func main() {
 		}()
 	}
 
-	// 5. Create Server with Middleware
+	// 5. Initialize Queue Producer
+	producer := queue.NewProducer(cfg.RedisAddr)
+	defer producer.Close()
+
+	// 6. Create Server with Middleware
 	// Order matters:
 	// 1. OTel (Tracing) - starts trace
 	// 2. RequestID - tags trace/log
 	// 3. Metrics - measures duration of handler
 	// 4. Logger - logs final status/duration
 	r := api.NewServer(
+		producer,
 		otelgin.Middleware("api-service"),
 		api.RequestIDMiddleware(),
+		api.RateLimitMiddleware(cfg.RateLimitRPS, cfg.RateLimitBurst),
 		api.MetricsMiddleware(),
 		api.LoggerMiddleware(),
 	)

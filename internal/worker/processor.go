@@ -3,12 +3,15 @@ package worker
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/sanjeevsethi/sre-platform-app/internal/queue"
 )
 
 // 1. Define Prometheus metrics for the worker
@@ -41,11 +44,46 @@ var (
 	)
 )
 
-// Job represents the work unit with metadata
-type Job struct {
-	ID        string `json:"id"`
-	Payload   string `json:"payload"`
-	RequestID string `json:"request_id"`
+// Use shared Job struct from queue package
+type Job = queue.Job
+
+const MaxRetries = 3
+
+func processJobWithRetry(l zerolog.Logger, job Job) (string, error) {
+	var err error
+	for i := 0; i <= MaxRetries; i++ {
+		if i > 0 {
+			backoff := time.Duration(1<<i) * 100 * time.Millisecond // 200ms, 400ms, 800ms
+			l.Warn().Int("attempt", i+1).Dur("backoff", backoff).Msg("Retrying job...")
+			time.Sleep(backoff)
+		}
+
+		// 4. Simulate job processing
+		start := time.Now()
+		// Logic:
+		// Check payload. If "fail_me", simulate error.
+		// If "fail_once", simulate error only on first attempt.
+		status := "success"
+		err = nil
+
+		if job.Payload == "fail_me" {
+			err = fmt.Errorf("simulated permanent failure")
+		} else if job.Payload == "fail_once" && i == 0 {
+			err = fmt.Errorf("simulated transient failure")
+		} else {
+			time.Sleep(100 * time.Millisecond)
+		}
+
+		duration := time.Since(start).Seconds()
+
+		if err != nil {
+			status = "error"
+		} else {
+			jobDuration.WithLabelValues(status).Observe(duration)
+			return status, nil // Success
+		}
+	}
+	return "error", err // Retries exhausted
 }
 
 // Start begins the worker processing loop. It blocks until the context is done.
@@ -107,20 +145,15 @@ func Start(ctx context.Context, rdb *redis.Client) {
 		l := log.With().Str("job_id", job.ID).Str("request_id", job.RequestID).Logger()
 		l.Info().Str("payload", job.Payload).Msg("Processing job")
 
-		// 4. Simulate job processing
-		start := time.Now()
-		time.Sleep(100 * time.Millisecond)
-		duration := time.Since(start).Seconds()
+		status, err := processJobWithRetry(l, job)
 
-		// 5. Instrument the outcome
-		status := "success"
-		if job.Payload == "fail_me" {
-			status = "error"
+		if err != nil {
 			jobsFailedTotal.Inc()
-			l.Warn().Str("payload", job.Payload).Msg("Job failed")
+			l.Error().Err(err).Msg("Job failed after retries")
+			// Future: Push to Dead Letter Queue (DLQ)
 		} else {
 			jobsProcessedTotal.Inc()
+			l.Info().Str("status", status).Msg("Job processed successfully")
 		}
-		jobDuration.WithLabelValues(status).Observe(duration)
 	}
 }
