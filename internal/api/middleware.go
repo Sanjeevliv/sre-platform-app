@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog/log"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/time/rate"
 )
 
@@ -90,6 +91,14 @@ func LoggerMiddleware() gin.HandlerFunc {
 			path = path + "?" + raw
 		}
 
+		// Extract trace_id and span_id from OpenTelemetry context
+		var traceID, spanID string
+		span := trace.SpanFromContext(c.Request.Context())
+		if span.SpanContext().IsValid() {
+			traceID = span.SpanContext().TraceID().String()
+			spanID = span.SpanContext().SpanID().String()
+		}
+
 		logger := log.Info()
 		if c.Writer.Status() >= 500 {
 			logger = log.Error()
@@ -104,6 +113,8 @@ func LoggerMiddleware() gin.HandlerFunc {
 			Dur("duration", duration).
 			Str("client_ip", c.ClientIP()).
 			Str("request_id", rid).
+			Str("trace_id", traceID).
+			Str("span_id", spanID).
 			Msg("Request processed")
 	}
 }
