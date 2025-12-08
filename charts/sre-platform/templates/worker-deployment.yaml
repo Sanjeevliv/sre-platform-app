@@ -19,15 +19,17 @@ spec:
         {{- include "sre-platform.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: worker
     spec:
-      # Use Spot VMs for 60-90% cost savings
-      nodeSelector:
-        cloud.google.com/gke-spot: "true"
+      # Spot VMs disabled - GCP quota limits on free tier
+      # nodeSelector:
+      #   cloud.google.com/gke-spot: "true"
       securityContext:
-        {{- toYaml .Values.worker.securityContext | nindent 8 }}
+        {{- toYaml .Values.worker.podSecurityContext | nindent 8 }}
       containers:
         - name: worker
           image: "{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.worker.containerSecurityContext | nindent 12 }}
           ports:
             - name: metrics
               containerPort: 8081
