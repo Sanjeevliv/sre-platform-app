@@ -386,3 +386,4 @@ kubectl apply -f k8s_legacy/
 ## 📄 License
 
 MIT License - See [LICENSE](LICENSE) for details.
+# CI/CD Pipeline Enabled
