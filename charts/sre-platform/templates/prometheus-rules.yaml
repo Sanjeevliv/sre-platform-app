@@ -1,0 +1,89 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-prometheus-rules
+  labels:
+    {{- include "sre-platform.labels" . | nindent 4 }}
+    prometheus: rules
+data:
+  sli-recording-rules.yaml: |
+    groups:
+      - name: sli-recording-rules
+        interval: 30s
+        rules:
+          # ============================================
+          # API Availability SLI
+          # ============================================
+          - record: sli:api_availability:ratio
+            expr: |
+              sum(rate(api_http_request_duration_seconds_count{status!~"5.."}[5m]))
+              /
+              sum(rate(api_http_request_duration_seconds_count[5m]))
+
+          # Availability over different windows
+          - record: sli:api_availability:ratio_1h
+            expr: |
+              sum(rate(api_http_request_duration_seconds_count{status!~"5.."}[1h]))
+              /
+              sum(rate(api_http_request_duration_seconds_count[1h]))
+
+          - record: sli:api_availability:ratio_24h
+            expr: |
+              sum(rate(api_http_request_duration_seconds_count{status!~"5.."}[24h]))
+              /
+              sum(rate(api_http_request_duration_seconds_count[24h]))
+
+          # ============================================
+          # API Latency SLI (p99)
+          # ============================================
+          - record: sli:api_latency_p99:seconds
+            expr: |
+              histogram_quantile(0.99,
+                sum(rate(api_http_request_duration_seconds_bucket[5m])) by (le)
+              )
+
+          - record: sli:api_latency_p95:seconds
+            expr: |
+              histogram_quantile(0.95,
+                sum(rate(api_http_request_duration_seconds_bucket[5m])) by (le)
+              )
+
+          - record: sli:api_latency_p50:seconds
+            expr: |
+              histogram_quantile(0.50,
+                sum(rate(api_http_request_duration_seconds_bucket[5m])) by (le)
+              )
+
+          # ============================================
+          # Worker Job Success Rate SLI
+          # ============================================
+          - record: sli:worker_success_rate:ratio
+            expr: |
+              sum(rate(worker_service_jobs_processed_total[5m]))
+              /
+              (sum(rate(worker_service_jobs_processed_total[5m])) + sum(rate(worker_service_jobs_failed_total[5m])))
+
+          # ============================================
+          # Request Rate (Traffic)
+          # ============================================
+          - record: sli:api_request_rate:per_second
+            expr: |
+              sum(rate(api_http_request_duration_seconds_count[5m]))
+
+          # ============================================
+          # Error Rate
+          # ============================================
+          - record: sli:api_error_rate:ratio
+            expr: |
+              sum(rate(api_http_request_duration_seconds_count{status=~"5.."}[5m]))
+              /
+              sum(rate(api_http_request_duration_seconds_count[5m]))
+
+          # ============================================
+          # Queue Depth (Saturation)
+          # ============================================
+          - record: sli:worker_queue_depth:current
+            expr: |
+              worker_queue_depth
+{{- end }}

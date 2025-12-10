@@ -115,3 +115,12 @@ redis:
       memory: 256Mi
     requests:
       memory: 64Mi
+
+# Monitoring Configuration
+monitoring:
+  enabled: true
+  # SLO Targets
+  slo:
+    apiAvailability: 99.9
+    apiLatencyP99Ms: 300
+    workerSuccessRate: 99.5
