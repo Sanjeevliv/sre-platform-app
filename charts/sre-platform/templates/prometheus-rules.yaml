@@ -86,4 +86,78 @@ data:
           - record: sli:worker_queue_depth:current
             expr: |
               worker_queue_depth
+  slo-alerting-rules.yaml: |
+    groups:
+      - name: slo-alerts
+        rules:
+          # ============================================
+          # API Availability SLO Alerts
+          # ============================================
+          # High Burn Rate: > 14.4x over 1h (consumes 2% of budget in 1h)
+          # Error Rate threshold > 14.4 * (1 - 0.999) = 0.0144
+          - alert: ApiAvailabilitySloBurnRateHigh
+            expr: |
+              (
+                sum(rate(api_http_request_duration_seconds_count{status=~"5.."}[1h]))
+                /
+                sum(rate(api_http_request_duration_seconds_count[1h]))
+              ) > (14.4 * 0.001)
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "High probability of API Availability SLO violation"
+              description: "API Availability burn rate is 14.4x the allowed rate for the last 1h."
+
+          # Elevated Burn Rate: > 6x over 6h (consumes 5% of budget in 6h)
+          # Error Rate threshold > 6 * (1 - 0.999) = 0.006
+          - alert: ApiAvailabilitySloBurnRateElevated
+            expr: |
+              (
+                sum(rate(api_http_request_duration_seconds_count{status=~"5.."}[6h]))
+                /
+                sum(rate(api_http_request_duration_seconds_count[6h]))
+              ) > (6 * 0.001)
+            for: 15m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Elevated API Availability SLO burn rate"
+              description: "API Availability burn rate is 6x the allowed rate for the last 6h."
+
+          # ============================================
+          # Error Budget Alerts
+          # ============================================
+          # Error Budget Low: < 25% remaining ( > 75% consumed) over rolling 30d
+          # Error Rate threshold > 0.75 * (1 - 0.999) = 0.00075
+          # Note: This checks if the average error rate over the last 30d is dangerously high.
+          - alert: ApiErrorBudgetLow
+            expr: |
+              (
+                sum(rate(api_http_request_duration_seconds_count{status=~"5.."}[30d]))
+                /
+                sum(rate(api_http_request_duration_seconds_count[30d]))
+              ) > (0.75 * 0.001)
+            for: 1h
+            labels:
+              severity: warning
+            annotations:
+              summary: "API Error Budget low (< 25% remaining)"
+              description: "API Availability error rate over the last 30d indicates < 25% budget remaining."
+
+          # Error Budget Exhausted: 0% remaining
+          # Error Rate threshold > 1.0 * (1 - 0.999) = 0.001
+          - alert: ApiErrorBudgetExhausted
+            expr: |
+              (
+                sum(rate(api_http_request_duration_seconds_count{status=~"5.."}[30d]))
+                /
+                sum(rate(api_http_request_duration_seconds_count[30d]))
+              ) > 0.001
+            for: 1h
+            labels:
+              severity: critical
+            annotations:
+              summary: "API Error Budget exhausted"
+              description: "API Availability error rate over the last 30d exceeds the SLO target."
 {{- end }}
