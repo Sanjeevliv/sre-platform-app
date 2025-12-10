@@ -277,7 +277,7 @@ readinessProbe:
 
 ## 📊 Observability
 
-### The Three Pillars
+### Observability Stack
 
 #### 1. Logs (Structured JSON)
 ```json
@@ -303,6 +303,12 @@ readinessProbe:
 http_requests_total{method="POST",path="/jobs",status="202"} 150
 http_request_duration_seconds_bucket{le="0.1"} 145
 ```
+
+#### 4. Reliability Targets (SLIs/SLOs)
+- **Service Level Indicators (SLIs)**: Defined via Prometheus recording rules (Availability, Latency).
+- **Service Level Objectives (SLOs)**: 99.9% Availability, <300ms Latency (p99).
+- **Alerting**: Multi-window burn rate alerts to protect the Error Budget.
+
 
 ### Correlation
 
@@ -359,7 +365,7 @@ kubectl apply -f k8s_legacy/
 
 ### In Progress 🟡
 - [ ] Inject `trace_id` into all logs
-- [ ] Define SLIs/SLOs in documentation
+- [x] Define SLIs/SLOs in documentation
 - [ ] Create Grafana dashboards
 - [ ] GitHub Actions CI/CD pipeline
 - [ ] cert-manager for automatic HTTPS
