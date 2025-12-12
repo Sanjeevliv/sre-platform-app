@@ -9,12 +9,15 @@ import (
 	"github.com/go-redis/redis/extra/redisotel/v8"
 	"github.com/go-redis/redis/v8"
 	"github.com/sony/gobreaker"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 type Job struct {
-	ID        string `json:"id"`
-	Payload   string `json:"payload"`
-	RequestID string `json:"request_id"`
+	ID          string `json:"id"`
+	Payload     string `json:"payload"`
+	RequestID   string `json:"request_id"`
+	TraceParent string `json:"trace_parent,omitempty"`
 }
 
 type Producer struct {
@@ -48,6 +51,11 @@ func NewProducer(addr string) *Producer {
 }
 
 func (p *Producer) Enqueue(ctx context.Context, job Job) error {
+	// Inject trace context into job
+	carrier := propagation.MapCarrier{}
+	otel.GetTextMapPropagator().Inject(ctx, carrier)
+	job.TraceParent = carrier.Get("traceparent")
+
 	_, err := p.cb.Execute(func() (interface{}, error) {
 		data, err := json.Marshal(job)
 		if err != nil {

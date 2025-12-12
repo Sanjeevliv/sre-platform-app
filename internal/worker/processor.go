@@ -12,6 +12,10 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/sanjeevsethi/sre-platform-app/internal/queue"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // 1. Define Prometheus metrics for the worker
@@ -141,8 +145,33 @@ func Start(ctx context.Context, rdb *redis.Client) {
 			}
 		}
 
-		// Create a logger with context for this job
-		l := log.With().Str("job_id", job.ID).Str("request_id", job.RequestID).Logger()
+		// Extract trace context
+		// We use the background context as root if no parent, but here we want to link.
+		// Since we are in a long-running loop with 'ctx', we use 'context.Background()' as base
+		// or 'ctx' but 'ctx' is the worker cancellation context.
+		// Using 'ctx' is fine as Extract primarily looks at the carrier.
+		processCtx := ctx
+		if job.TraceParent != "" {
+			carrier := propagation.MapCarrier{"traceparent": job.TraceParent}
+			processCtx = otel.GetTextMapPropagator().Extract(processCtx, carrier)
+		}
+
+		// Start span
+		tracer := otel.Tracer("worker-service")
+		_, span := tracer.Start(processCtx, "worker.process_job", trace.WithAttributes(
+			attribute.String("job_id", job.ID),
+			attribute.String("request_id", job.RequestID),
+			attribute.String("payload", job.Payload),
+		))
+
+		// Create a logger with context for this job, including trace info
+		l := log.With().
+			Str("job_id", job.ID).
+			Str("request_id", job.RequestID).
+			Str("trace_id", span.SpanContext().TraceID().String()).
+			Str("span_id", span.SpanContext().SpanID().String()).
+			Logger()
+
 		l.Info().Str("payload", job.Payload).Msg("Processing job")
 
 		status, err := processJobWithRetry(l, job)
@@ -155,5 +184,6 @@ func Start(ctx context.Context, rdb *redis.Client) {
 			jobsProcessedTotal.Inc()
 			l.Info().Str("status", status).Msg("Job processed successfully")
 		}
+		span.End()
 	}
 }
