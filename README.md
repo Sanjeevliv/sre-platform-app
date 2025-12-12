@@ -364,7 +364,7 @@ kubectl apply -f k8s_legacy/
 - [x] Helm charts with HPA
 
 ### In Progress 🟡
-- [ ] Inject `trace_id` into all logs
+- [x] Inject `trace_id` into all logs
 - [x] Define SLIs/SLOs in documentation
 - [ ] Create Grafana dashboards
 - [ ] GitHub Actions CI/CD pipeline
