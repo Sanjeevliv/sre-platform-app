@@ -287,6 +287,50 @@
             ],
             "title": "Container Memory Usage",
             "type": "timeseries"
+        },
+        {
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 27
+            },
+            "id": 12,
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "go_goroutines",
+                    "legendFormat": "{{job}}",
+                    "refId": "A"
+                }
+            ],
+            "title": "Goroutines (Leak Detection)",
+            "type": "timeseries"
+        },
+        {
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 27
+            },
+            "id": 13,
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "expr": "increase(kube_pod_container_status_restarts_total[1h])",
+                    "legendFormat": "{{pod}}",
+                    "refId": "A"
+                }
+            ],
+            "title": "Pod Restarts (Last 1h)",
+            "type": "timeseries"
         }
     ],
     "refresh": "10s",
